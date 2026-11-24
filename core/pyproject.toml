@@ -1,0 +1,177 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "arise-core"
+version = "1.0.0"
+description = "ARISE Core - Personal Digital Operator AI System"
+authors = ["ARISE Team"]
+readme = "README.md"
+packages = [
+    { include = "config" },
+    { include = "database" },
+    { include = "errors" },
+    { include = "events" },
+    { include = "logging" },
+    { include = "metrics" },
+    { include = "models" },
+    { include = "runtime" },
+    { include = "task_engine" },
+    { include = "policy_engine" },
+    { include = "model_router" },
+    { include = "memory" },
+    { include = "voice" },
+    { include = "automation" },
+    { include = "agents" },
+    { include = "security" },
+]
+include = ["README.md"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+# Web Framework
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+pydantic = "^2.6.0"
+pydantic-settings = "^2.1.0"
+
+# Database
+sqlalchemy = "^2.0.0"
+alembic = "^1.13.0"
+asyncpg = "^0.29.0"
+aiosqlite = "^0.19.0"
+
+# Redis
+redis = "^5.0.0"
+
+# Observability
+prometheus-client = "^0.19.0"
+structlog = "^24.1.0"
+
+# LLM Providers
+openai = "^1.12.0"
+anthropic = "^0.18.0"
+google-generativeai = "^0.7.0"
+ollama = "^0.2.0"
+
+# Voice Pipeline
+pvporcupine = "^3.0.0"
+sherpa-onnx = "^1.10.0"
+torch = "^2.1.0"
+torchaudio = "^2.1.0"
+whisper = {extras = ["faster-whisper"], version = "^1.1.0"}
+elevenlabs = "^0.2.0"
+coqui-tts = "^0.17.0"
+
+# Desktop Automation
+playwright = "^1.40.0"
+comtypes = "^1.2.0"
+opencv-python = "^4.8.0"
+pytesseract = "^0.3.10"
+paddleocr = "^2.7.0"
+mss = "^9.0.0"
+
+# Memory
+chromadb = "^0.4.0"
+sentence-transformers = "^2.2.0"
+presidio-analyzer = "^2.2.0"
+presidio-anonymizer = "^2.2.0"
+
+# Testing
+pytest = "^7.4.0"
+pytest-asyncio = "^0.23.0"
+pytest-cov = "^4.1.0"
+hypothesis = "^6.92.0"
+pytest-mock = "^3.12.0"
+
+# Code Quality
+ruff = "^0.1.0"
+black = "^23.12.0"
+mypy = "^1.8.0"
+pre-commit = "^3.6.0"
+
+# Utilities
+python-dotenv = "^1.0.0"
+pyyaml = "^6.0.0"
+httpx = "^0.26.0"
+tenacity = "^8.2.0"
+tiktoken = "^0.5.0"
+python-json-logger = "^2.0.0"
+
+# Security & Secrets
+cryptography = "^41.0.0"
+hvac = "^1.2.0"
+keyring = "^24.0.0"
+pywin32 = {version = "^306", markers = "sys_platform == 'win32'"}
+
+[tool.poetry.group.dev.dependencies]
+pytest-xdist = "^3.5.0"
+pytest-benchmark = "^4.0.0"
+locust = "^2.17.0"
+bandit = "^1.7.0"
+safety = "^2.3.0"
+
+[tool.poetry.scripts]
+dev-core = "core.runtime.main:run_dev"
+db-migrate = "scripts.db_migrate:main"
+db-inspect = "scripts.db_inspect:main"
+
+[tool.poetry.extras]
+voice = ["pvporcupine", "sherpa-onnx", "whisper", "elevenlabs", "coqui-tts"]
+automation = ["playwright", "comtypes", "opencv-python", "pytesseract", "paddleocr", "mss"]
+memory = ["chromadb", "sentence-transformers", "presidio-analyzer", "presidio-anonymizer"]
+all = ["voice", "automation", "memory"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E", "F", "I", "N", "W", "UP", "B", "C4", "DTZ", "T10", "T20", "PTH", "PL", "TRY", "SIM", "RET"
+]
+ignore = ["E501", "B008"]
+per-file-ignores = { "tests/*": ["S101"], "scripts/*": ["T201"] }
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+show_error_codes = true
+namespace_packages = true
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short --strict-markers"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "scripts/*", "*/migrations/*", "*/conftest.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

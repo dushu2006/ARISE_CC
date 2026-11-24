@@ -1,0 +1,105 @@
+﻿{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: FastAPI Debug",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "core.runtime.main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/core",
+      "env": {
+        "ENVIRONMENT": "development",
+        "LOG_LEVEL": "DEBUG"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}/core",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Pytest Debug",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "--tb=short",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}/core",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Rust: Tauri Debug",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/src-tauri/target/debug/arise-tauri",
+      "args": [],
+      "cwd": "${workspaceFolder}/src-tauri",
+      "preLaunchTask": "Rust: Build Debug"
+    },
+    {
+      "name": "Rust: Cargo Test",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/src-tauri/target/debug/deps/arise_tauri-${hash}",
+      "args": [],
+      "cwd": "${workspaceFolder}/src-tauri",
+      "preLaunchTask": "Rust: Build Test"
+    },
+    {
+      "name": "TypeScript: Vite Dev",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": "${workspaceFolder}/src",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "TypeScript: Vitest Debug",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "test:run",
+        "--",
+        "--reporter=verbose"
+      ],
+      "cwd": "${workspaceFolder}/src",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Compound: Full Stack",
+      "type": "compound",
+      "configurations": [
+        "Python: FastAPI Debug",
+        "TypeScript: Vite Dev"
+      ],
+      "preLaunchTask": "Rust: Build Debug"
+    }
+  ]
+}

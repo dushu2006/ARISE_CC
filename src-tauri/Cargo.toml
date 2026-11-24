@@ -1,0 +1,100 @@
+[package]
+name = "arise-tauri"
+version = "1.0.0"
+description = "ARISE Tauri 2 Desktop Application"
+authors = ["ARISE Team"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/arise/arise"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+# Tauri 2
+tauri = { version = "2.0", features = [
+    "shell",
+    "dialog",
+    "fs",
+    "http",
+    "updater",
+    "notification",
+    "global-shortcut",
+    "clipboard",
+    "positioner",
+    "single-instance",
+] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_toml = "0.8"
+
+# Async Runtime
+tokio = { version = "1.0", features = ["full", "rt-multi-thread", "macros"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.6"
+
+# Windows-specific
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_Security_Credentials",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+] }
+
+# CLI
+clap = { version = "4.4", features = ["derive", "env"] }
+
+# Config
+config = "0.13"
+dirs = "5.0"
+
+# Crypto
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+zeroize = "1.7"
+
+# Audio
+cpal = "0.14"
+hound = "3.5"
+
+# Image
+image = "0.24"
+
+# HTTP
+reqwest = { version = "0.11", features = ["json", "rustls-tls", "blocking"] }
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
+dashmap = "5.5"
+
+[dev-dependencies]
+mockall = "0.12"
+proptest = "1.0"
+tokio-test = "0.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+debug = true
+
+[workspace]
+members = [
+    "src-tauri",
+]

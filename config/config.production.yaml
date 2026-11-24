@@ -1,0 +1,283 @@
+# ARISE Production Configuration
+# Overrides for production environment
+
+version: "1.2.0"
+
+environment: "production"
+debug: false
+
+# Database - PostgreSQL for production
+database:
+  url: "postgresql+asyncpg://arise:password@localhost:5432/arise"
+  pool_size: 20
+  max_overflow: 30
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+
+# Redis - Production Redis with auth
+redis:
+  url: "redis://:password@localhost:6379/0"
+  max_connections: 100
+  socket_timeout: 5
+  socket_connect_timeout: 5
+
+# Model Router - Production providers
+model_router:
+  default_provider: "openai"
+  privacy_mode: "redact"
+  fallback_chain:
+    - "openai"
+    - "anthropic"
+    - "gemini"
+    - "azure_openai"
+  providers:
+    openai:
+      enabled: true
+      models:
+        - "gpt-4o"
+        - "gpt-4o-mini"
+        - "gpt-4-turbo"
+      default_model: "gpt-4o"
+    anthropic:
+      enabled: true
+      models:
+        - "claude-3-5-sonnet-20241022"
+        - "claude-3-5-haiku-20241022"
+      default_model: "claude-3-5-sonnet-20241022"
+    gemini:
+      enabled: true
+      models:
+        - "gemini-1.5-pro"
+        - "gemini-1.5-flash"
+      default_model: "gemini-1.5-pro"
+    azure_openai:
+      enabled: true
+      models:
+        - "gpt-4o"
+        - "gpt-4o-mini"
+      default_model: "gpt-4o"
+    ollama:
+      enabled: false
+    vertex_ai:
+      enabled: false
+  cost_tracking_enabled: true
+  circuit_breaker_enabled: true
+  circuit_breaker_threshold: 5
+  circuit_breaker_timeout: 60
+
+# Task Engine - Production limits
+task_engine:
+  max_concurrent_tasks: 50
+  task_timeout_seconds: 7200
+  sandbox:
+    enabled: true
+    type: "docker"
+    docker_image: "arise/sandbox:latest"
+    memory_limit_mb: 1024
+    cpu_limit_percent: 75
+    disk_limit_mb: 2048
+    network_enabled: false
+    timeout_seconds: 600
+
+# Policy Engine - Strict for production
+policy_engine:
+  risk_levels:
+    R0:
+      auto_approve: true
+    R1:
+      auto_approve: true
+    R2:
+      auto_approve: false
+    R3:
+      auto_approve: false
+      requires_mfa: true
+    R4:
+      auto_approve: false
+      requires_mfa: true
+  approval_ui_enabled: true
+  audit_enabled: true
+
+# Voice - Full production config
+voice:
+  enabled: true
+  wake_word:
+    enabled: true
+    model: "hey_arise"
+    sensitivity: 0.5
+  asr:
+    primary: "sherpa_onnx"
+    fallback_chain:
+      - "sherpa_onnx"
+      - "gemini"
+      - "azure"
+  tts:
+    primary: "gemini"
+    fallback_chain:
+      - "gemini"
+      - "elevenlabs"
+      - "azure"
+  session:
+    timeout_seconds: 30
+    max_duration_seconds: 7200
+    barge_in_enabled: true
+
+# Memory - Full production limits
+memory:
+  kinds:
+    SEMANTIC:
+      max_items: 1000000
+      ttl_days: 3650
+    EPISODIC:
+      max_items: 500000
+      ttl_days: 365
+    PROCEDURAL:
+      max_items: 100000
+      ttl_days: 3650
+    PREFERENCE:
+      max_items: 10000
+      ttl_days: 3650
+    WORKING:
+      max_items: 10000
+      ttl_days: 7
+  consolidation:
+    enabled: true
+    interval_hours: 4
+  governance:
+    pii_detection_enabled: true
+    pii_action: "redact"
+    encryption_enabled: true
+    max_memories_per_kind: 1000000
+    lru_eviction_enabled: true
+
+# Automation - Full production
+automation:
+  enabled: true
+  perception_hierarchy:
+    - "uia"
+    - "playwright"
+    - "cv_ocr"
+  uia:
+    enabled: true
+    retry_attempts: 5
+  playwright:
+    enabled: true
+    browser: "chromium"
+    headless: true
+    stealth_mode: true
+  cv_ocr:
+    enabled: true
+    ocr_engine: "paddleocr"
+    confidence_threshold: 0.8
+
+# Security - Maximum hardening
+security:
+  credentials:
+    primary_provider: "windows_credential_manager"
+    fallback_providers:
+      - "vault"
+      - "keyring"
+  network:
+    egress_control_enabled: true
+    default_policy: "deny"
+    allowlist:
+      - "api.openai.com"
+      - "api.anthropic.com"
+      - "generativelanguage.googleapis.com"
+      - "api.elevenlabs.io"
+      - "localhost"
+      - "127.0.0.1"
+    dns_blocking_enabled: true
+    proxy_interception_enabled: true
+  prompt_injection:
+    enabled: true
+    model: "promptguard"
+    heuristic_rules_enabled: true
+  audit:
+    enabled: true
+    tamper_evident: true
+    encryption_enabled: true
+    log_credential_access: true
+    log_network_blocks: true
+    log_prompt_injections: true
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_derivation: "PBKDF2"
+    key_rotation_days: 30
+    field_level_encryption: true
+
+# Agents - Full production
+agents:
+  enabled: true
+  coordinator:
+    model: "gpt-4o"
+    max_delegation_depth: 10
+    timeout_seconds: 600
+  specialists:
+    planner:
+      model: "gpt-4o"
+    coder:
+      model: "gpt-4o"
+    researcher:
+      model: "gemini-1.5-pro"
+    analyst:
+      model: "claude-3-5-sonnet-20241022"
+    creative:
+      model: "gpt-4o"
+    automation:
+      model: "gpt-4o"
+    memory:
+      model: "gpt-4o-mini"
+    security:
+      model: "gpt-4o"
+    reviewer:
+      model: "gpt-4o"
+    communicator:
+      model: "gpt-4o-mini"
+    scheduler:
+      model: "gpt-4o-mini"
+  registry:
+    heartbeat_interval_seconds: 15
+    max_restarts: 5
+    health_check_timeout: 5
+
+# Telemetry - Production observability
+telemetry:
+  enabled: true
+  logging:
+    level: "INFO"
+    format: "json"
+    output: "stdout"
+  metrics:
+    enabled: true
+    port: 9090
+  tracing:
+    enabled: true
+    jaeger_endpoint: "http://jaeger:4317"
+    sample_rate: 0.01
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+
+# Events - Distributed for production
+events:
+  local:
+    enabled: true
+    worker_count: 8
+    queue_size: 50000
+  distributed:
+    enabled: true
+    redis_streams_enabled: true
+    consumer_group: "arise-events-prod"
+  store:
+    enabled: true
+    type: "postgres"
+    path: "postgresql://arise:password@localhost:5432/arise_events"
+  projections:
+    enabled: true
+    checkpoint_interval: 1000
+
+# Frontend - Production URLs
+frontend:
+  api_base_url: "https://api.arise.example.com"
+  ws_base_url: "wss://api.arise.example.com"

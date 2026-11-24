@@ -1,0 +1,185 @@
+﻿{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Rust: Build Debug",
+      "type": "shell",
+      "command": "cargo build",
+      "group": "build",
+      "problemMatcher": "$rustc",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      }
+    },
+    {
+      "label": "Rust: Build Release",
+      "type": "shell",
+      "command": "cargo build --release",
+      "group": "build",
+      "problemMatcher": "$rustc",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      }
+    },
+    {
+      "label": "Rust: Build Test",
+      "type": "shell",
+      "command": "cargo test --no-run",
+      "group": "test",
+      "problemMatcher": "$rustc",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      }
+    },
+    {
+      "label": "Rust: Clippy",
+      "type": "shell",
+      "command": "cargo clippy",
+      "group": "build",
+      "problemMatcher": "$rustc",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      }
+    },
+    {
+      "label": "Rust: Format",
+      "type": "shell",
+      "command": "cargo fmt",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/src-tauri"
+      }
+    },
+    {
+      "label": "Python: Install Dependencies",
+      "type": "shell",
+      "command": "poetry install --no-interaction --with voice,automation,memory,dev",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/core"
+      }
+    },
+    {
+      "label": "Python: Run Migrations",
+      "type": "shell",
+      "command": "poetry run alembic upgrade head",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/core"
+      }
+    },
+    {
+      "label": "Python: Run Tests",
+      "type": "shell",
+      "command": "poetry run pytest tests/unit -v --tb=short",
+      "group": "test",
+      "options": {
+        "cwd": "${workspaceFolder}/core"
+      }
+    },
+    {
+      "label": "Python: Format",
+      "type": "shell",
+      "command": "poetry run ruff format . && poetry run black .",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/core"
+      }
+    },
+    {
+      "label": "Python: Lint",
+      "type": "shell",
+      "command": "poetry run ruff check . && poetry run mypy .",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/core"
+      }
+    },
+    {
+      "label": "TypeScript: Install Dependencies",
+      "type": "shell",
+      "command": "npm ci",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/src"
+      }
+    },
+    {
+      "label": "TypeScript: Build",
+      "type": "shell",
+      "command": "npm run build",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/src"
+      }
+    },
+    {
+      "label": "TypeScript: Lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/src"
+      }
+    },
+    {
+      "label": "TypeScript: Format",
+      "type": "shell",
+      "command": "npm run format",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/src"
+      }
+    },
+    {
+      "label": "TypeScript: Type Check",
+      "type": "shell",
+      "command": "npm run type-check",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/src"
+      }
+    },
+    {
+      "label": "Docker: Build Core",
+      "type": "shell",
+      "command": "docker build -f docker/Dockerfile.core -t arise/core:latest .",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "Docker: Build Tauri",
+      "type": "shell",
+      "command": "docker build -f docker/Dockerfile.tauri -t arise/tauri:latest .",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "Docker: Compose Up",
+      "type": "shell",
+      "command": "docker compose -f docker/docker-compose.yml up -d",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "Full Build",
+      "type": "shell",
+      "command": "make build",
+      "group": "build",
+      "dependsOn": [
+        "Rust: Build Release",
+        "Python: Install Dependencies",
+        "TypeScript: Build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    }
+  ]
+}

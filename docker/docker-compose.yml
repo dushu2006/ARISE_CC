@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # Core API Server
+  # =============================================================================
+  core:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.core
+    container_name: arise-core
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql+asyncpg://arise:arise@postgres:5432/arise
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - PORCUPINE_ACCESS_KEY=${PORCUPINE_ACCESS_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - MASTER_ENCRYPTION_KEY=${MASTER_ENCRYPTION_KEY}
+    volumes:
+      - ../core:/app/core:ro
+      - ../config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - arise-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Tauri App (for headless testing)
+  # =============================================================================
+  tauri:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.tauri
+    container_name: arise-tauri
+    ports:
+      - "5173:5173"
+      - "8001:8000"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql+asyncpg://arise:arise@postgres:5432/arise
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ../src-tauri/target/release/bundle:/app/bundle:ro
+    depends_on:
+      - core
+    networks:
+      - arise-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: arise-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=arise
+      - POSTGRES_PASSWORD=arise
+      - POSTGRES_DB=arise
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../core/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - arise-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Redis Cache
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: arise-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - arise-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Prometheus Monitoring
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: arise-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../docker/prometheus.rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - arise-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Grafana Dashboards
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: arise-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ../docker/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../docker/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - arise-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Loki Log Aggregation (Optional)
+  # =============================================================================
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: arise-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../docker/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - arise-network
+    restart: unless-stopped
+    profiles:
+      - observability
+
+  # =============================================================================
+  # Jaeger Distributed Tracing (Optional)
+  # =============================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: arise-jaeger
+    ports:
+      - "16686:16686"
+      - "6831:6831/udp"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=badger
+    volumes:
+      - jaeger-data:/var/lib/jaeger
+    networks:
+      - arise-network
+    restart: unless-stopped
+    profiles:
+      - observability
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  jaeger-data:
+
+networks:
+  arise-network:
+    driver: bridge

@@ -1,0 +1,138 @@
+# ARISE Development Configuration
+# Overrides for development environment
+
+version: "1.2.0"
+
+environment: "development"
+debug: true
+
+# Database - SQLite for development
+database:
+  url: "sqlite+aiosqlite:///./arise_dev.db"
+  echo: true
+  pool_size: 2
+
+# Redis - Local development
+redis:
+  url: "redis://localhost:6379/1"
+
+# Model Router - Use local models where possible
+model_router:
+  default_provider: "ollama"
+  privacy_mode: "local_only"
+  fallback_chain:
+    - "ollama"
+    - "openai"
+    - "anthropic"
+  providers:
+    ollama:
+      enabled: true
+      base_url: "http://localhost:11434"
+      models:
+        - "llama3.1:8b"
+        - "codellama:13b"
+      default_model: "llama3.1:8b"
+    openai:
+      enabled: true
+      models:
+        - "gpt-4o-mini"
+      default_model: "gpt-4o-mini"
+    anthropic:
+      enabled: false
+    gemini:
+      enabled: false
+
+# Task Engine - Relaxed limits for development
+task_engine:
+  max_concurrent_tasks: 5
+  task_timeout_seconds: 1800
+  sandbox:
+    enabled: false
+
+# Policy Engine - Auto-approve for development
+policy_engine:
+  risk_levels:
+    R0:
+      auto_approve: true
+    R1:
+      auto_approve: true
+    R2:
+      auto_approve: true
+    R3:
+      auto_approve: true
+      requires_mfa: false
+    R4:
+      auto_approve: false
+      requires_mfa: true
+  approval_ui_enabled: false
+
+# Voice - Disabled by default in dev
+voice:
+  enabled: false
+
+# Memory - Smaller limits for development
+memory:
+  kinds:
+    SEMANTIC:
+      max_items: 10000
+    EPISODIC:
+      max_items: 5000
+    WORKING:
+      max_items: 1000
+
+# Automation - UIA only for development
+automation:
+  perception_hierarchy:
+    - "uia"
+  uia:
+    enabled: true
+  playwright:
+    enabled: false
+  cv_ocr:
+    enabled: false
+
+# Security - Relaxed for development
+security:
+  network:
+    egress_control_enabled: false
+    default_policy: "allow"
+  prompt_injection:
+    enabled: false
+  audit:
+    enabled: false
+
+# Agents - Limited for development
+agents:
+  specialists:
+    planner:
+      model: "gpt-4o-mini"
+    coder:
+      model: "gpt-4o-mini"
+    researcher:
+      enabled: false
+    analyst:
+      enabled: false
+
+# Telemetry - Debug logging
+telemetry:
+  logging:
+    level: "DEBUG"
+    format: "text"
+  metrics:
+    enabled: true
+    port: 9091
+  tracing:
+    enabled: false
+
+# Events - Local only
+events:
+  local:
+    enabled: true
+    worker_count: 2
+  distributed:
+    enabled: false
+
+# Frontend - Development URLs
+frontend:
+  api_base_url: "http://localhost:8000"
+  ws_base_url: "ws://localhost:8000"

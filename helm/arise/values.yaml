@@ -1,0 +1,300 @@
+# ARISE Helm Chart Values
+# Default values for production deployment
+
+# Global settings
+global:
+  imageRegistry: "ghcr.io"
+  imageRepository: "arise"
+  imageTag: "latest"
+  imagePullSecrets: []
+  serviceAccountName: "arise"
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+# Core API Server
+core:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: core
+    tag: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  service:
+    type: ClusterIP
+    port: 8000
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      nginx.ingress.kubernetes.io/websocket-services: "arise-core"
+    hosts:
+      - host: api.arise.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: arise-tls
+        hosts:
+          - api.arise.example.com
+  env:
+    ENVIRONMENT: "production"
+    LOG_LEVEL: "INFO"
+    MODEL_ROUTER_DEFAULT_PROVIDER: "openai"
+    MODEL_ROUTER_PRIVACY_MODE: "redact"
+    VOICE_ENABLED: "true"
+    AUTOMATION_UIA_ENABLED: "true"
+    AUTOMATION_PLAYWRIGHT_ENABLED: "true"
+    AUTOMATION_CV_OCR_ENABLED: "true"
+    MEMORY_CONSOLIDATION_ENABLED: "true"
+    AGENTS_MULTI_AGENT_ENABLED: "true"
+    SECURITY_PROMPT_INJECTION_ENABLED: "true"
+    SECURITY_NETWORK_EGRESS_ENABLED: "true"
+    TELEMETRY_ENABLED: "true"
+  envFromSecrets:
+    - name: arise-secrets
+      prefix: ""
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 60
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  startupProbe:
+    httpGet:
+      path: /live
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 30
+
+# Frontend
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - host: app.arise.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: arise-tls
+        hosts:
+          - app.arise.example.com
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  auth:
+    username: "arise"
+    database: "arise"
+    existingSecret: "arise-secrets"
+    secretKeys:
+      adminPasswordKey: "POSTGRES_PASSWORD"
+  primary:
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: "20Gi"
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  service:
+    port: 5432
+
+# Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  auth:
+    enabled: true
+    existingSecret: "arise-secrets"
+    secretKeys:
+      passwordKey: "REDIS_PASSWORD"
+  master:
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: "5Gi"
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "512mb"
+      - --maxmemory-policy
+      - "allkeys-lru"
+  service:
+    port: 6379
+
+# Prometheus
+prometheus:
+  enabled: true
+  namespace: "arise-monitoring"
+  server:
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
+    persistentVolume:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: "50Gi"
+    retention: "30d"
+    service:
+      type: ClusterIP
+      port: 9090
+
+# Grafana
+grafana:
+  enabled: true
+  namespace: "arise-monitoring"
+  admin:
+    existingSecret: "arise-secrets"
+    userKey: "GRAFANA_USER"
+    passwordKey: "GRAFANA_PASSWORD"
+  persistence:
+    enabled: true
+    storageClass: "standard"
+    size: "10Gi"
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - monitoring.arise.example.com
+    tls:
+      - secretName: arise-tls
+        hosts:
+          - monitoring.arise.example.com
+  dashboards:
+    default:
+      arise-overview:
+        json: |-
+          {"dashboard": "overview"}
+      arise-task-engine:
+        json: |-
+          {"dashboard": "task-engine"}
+      arise-model-router:
+        json: |-
+          {"dashboard": "model-router"}
+      arise-voice-pipeline:
+        json: |-
+          {"dashboard": "voice-pipeline"}
+      arise-agent-system:
+        json: |-
+          {"dashboard": "agent-system"}
+      arise-system-resources:
+        json: |-
+          {"dashboard": "system-resources"}
+
+# Loki (optional)
+loki:
+  enabled: false
+  namespace: "arise-monitoring"
+
+# Jaeger (optional)
+jaeger:
+  enabled: false
+  namespace: "arise-monitoring"
+
+# Secrets (to be created separately or via external secrets operator)
+secrets:
+  enabled: false
+  # If enabled, creates a Secret with these keys
+  # Values should be provided at install time via --set or values file
+  data: {}
+
+# Network Policies
+networkPolicies:
+  enabled: true
+
+# Pod Disruption Budgets
+podDisruptionBudgets:
+  enabled: true
+
+# Service Monitors for Prometheus
+serviceMonitors:
+  enabled: true
+  namespace: "arise-monitoring"
+
+# Pod Monitors for Prometheus
+podMonitors:
+  enabled: false
+
+# ConfigMaps for configuration
+configMaps:
+  enabled: true

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: arise
+description: ARISE - Personal Digital Operator AI System Helm Chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - assistant
+  - automation
+  - voice
+  - multi-agent
+maintainers:
+  - name: ARISE Team
+    email: team@arise.example.com
+sources:
+  - https://github.com/arise/arise
+home: https://arise.example.com

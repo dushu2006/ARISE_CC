@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arise
+  labels:
+    name: arise
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arise-staging
+  labels:
+    name: arise-staging
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: arise-monitoring
+  labels:
+    name: arise-monitoring
+    environment: monitoring

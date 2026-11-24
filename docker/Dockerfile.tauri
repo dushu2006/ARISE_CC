@@ -1,0 +1,102 @@
+# ARISE Tauri - Production Dockerfile
+# Multi-stage build for Tauri desktop app
+
+# =============================================================================
+# Build Stage
+# =============================================================================
+FROM rust:1.75-slim AS builder
+
+# Install system dependencies for Tauri
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    libssl-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    libsoup-3.0-dev \
+    curl \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js for frontend build
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy Cargo files
+COPY src-tauri/Cargo.toml src-tauri/Cargo.lock* ./
+
+# Create dummy src for dependency caching
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies
+RUN cargo build --release 2>/dev/null || true
+
+# Copy actual source
+COPY src-tauri/ ./src-tauri/
+COPY src/ ./src/
+
+# Build frontend
+RUN cd src && npm ci && npm run build
+
+# Build Tauri app
+RUN cd src-tauri && cargo tauri build
+
+# =============================================================================
+# Runtime Stage
+# =============================================================================
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libwebkit2gtk-4.1-0 \
+    libappindicator3-1 \
+    librsvg2-2 \
+    libgtk-3-0 \
+    libayatana-appindicator3-1 \
+    libsoup-3.0-0 \
+    libasound2 \
+    libx11-6 \
+    libxcb1 \
+    libxrandr2 \
+    libxss1 \
+    libxtst6 \
+    libnss3 \
+    libdrm2 \
+    libgbm1 \
+    libxshmfence1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r arise && useradd -r -g arise arise
+
+# Set working directory
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=builder /app/src-tauri/target/release/bundle/ ./bundle/
+
+# Find the executable (path varies by bundle type)
+RUN find ./bundle -name "arise-tauri" -type f -executable | head -1 | xargs -I {} cp {} /app/arise-tauri
+
+# Set permissions
+RUN chmod +x /app/arise-tauri && chown -R arise:arise /app
+
+USER arise
+
+# Expose ports (for WebSocket and health checks)
+EXPOSE 8000 5173
+
+# Run the application
+CMD ["/app/arise-tauri"]

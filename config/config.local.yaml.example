@@ -1,0 +1,59 @@
+# ARISE Local Configuration (EXAMPLE)
+# Copy this file to config.local.yaml and fill in your values
+# This file is gitignored - never commit secrets!
+
+version: "1.2.0"
+
+# Environment override
+# environment: "development"
+# debug: true
+
+# Database override (e.g., for local PostgreSQL)
+# database:
+#   url: "postgresql+asyncpg://user:pass@localhost:5432/arise_local"
+
+# Redis override
+# redis:
+#   url: "redis://localhost:6379/2"
+
+# API Keys - NEVER commit these!
+# model_router:
+#   providers:
+#     openai:
+#       api_key: "sk-your-openai-key"
+#     anthropic:
+#       api_key: "sk-ant-your-anthropic-key"
+#     google:
+#       api_key: "your-google-api-key"
+#     azure_openai:
+#       api_key: "your-azure-key"
+#       endpoint: "https://your-resource.openai.azure.com"
+#     vertex_ai:
+#       project_id: "your-gcp-project"
+#       location: "us-central1"
+
+# Voice API Keys
+# voice:
+#   porcupine_access_key: "your-porcupine-key"
+#   elevenlabs_api_key: "your-elevenlabs-key"
+
+# Security
+# security:
+#   encryption:
+#     master_key: "your-base64-encoded-master-key"
+#   credentials:
+#     vault_addr: "https://vault.example.com"
+#     vault_token: "your-vault-token"
+
+# Telemetry
+# telemetry:
+#   tracing:
+#     otel_exporter_otlp_endpoint: "http://localhost:4317"
+#   logging:
+#     level: "DEBUG"
+
+# Feature flags for local testing
+# feature_flags:
+#   voice.enabled: true
+#   automation.uia_enabled: true
+#   memory.consolidation_enabled: true

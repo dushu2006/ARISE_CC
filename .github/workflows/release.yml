@@ -1,0 +1,347 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  POETRY_VERSION: 1.7.1
+  NODE_VERSION: '20'
+  RUST_VERSION: 'stable'
+
+jobs:
+  # =============================================================================
+  # Prepare Release
+  # =============================================================================
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: extract_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog from commit messages since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            CHANGELOG=$(git log $LAST_TAG..HEAD --pretty=format:"- %s (%an)" --reverse)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%an)" --reverse)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update version files
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          VERSION_NO_V="${VERSION#v}"
+
+          # Update pyproject.toml
+          sed -i "s/^version = \".*\"/version = \"$VERSION_NO_V\"/" core/pyproject.toml
+
+          # Update Cargo.toml
+          sed -i "s/^version = \".*\"/version = \"$VERSION_NO_V\"/" src-tauri/Cargo.toml
+
+          # Update package.json
+          cd src && npm version $VERSION_NO_V --no-git-tag-version
+
+          # Update Tauri config
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION_NO_V\"/" src-tauri/tauri.conf.json
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add core/pyproject.toml src-tauri/Cargo.toml src/package.json src-tauri/tauri.conf.json
+          git commit -m "chore: release ${{ steps.extract_version.outputs.version }}"
+          git push
+
+  # =============================================================================
+  # Build & Test
+  # =============================================================================
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'poetry'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      - name: Install core dependencies
+        run: cd core && poetry install --no-interaction --with voice,automation,memory
+
+      - name: Run tests
+        run: cd core && poetry run pytest tests/unit tests/integration -v --tb=short
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///test.db
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: test
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Build frontend
+        run: cd src && npm ci && npm run build
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Build Tauri
+        run: cd src-tauri && cargo tauri build
+
+      - name: Upload Tauri artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-artifacts
+          path: src-tauri/target/release/bundle/
+
+  # =============================================================================
+  # Build Windows Installer
+  # =============================================================================
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    needs: prepare
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Install dependencies
+        run: |
+          cd src && npm ci
+          cd ../src-tauri && cargo fetch
+
+      - name: Build Tauri with NSIS
+        run: cd src-tauri && cargo tauri build --target x86_64-pc-windows-msvc
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+
+  # =============================================================================
+  # Build Docker Images
+  # =============================================================================
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push core image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.core
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/core:${{ needs.prepare.outputs.version }}
+            ghcr.io/${{ github.repository }}/core:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push tauri image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.tauri
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/tauri:${{ needs.prepare.outputs.version }}
+            ghcr.io/${{ github.repository }}/tauri:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # Create GitHub Release
+  # =============================================================================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [prepare, build-test, build-windows, build-docker]
+    steps:
+      - name: Download Tauri artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tauri-artifacts
+          path: tauri-artifacts
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: windows-installer
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: ARISE ${{ needs.prepare.outputs.version }}
+          body: |
+            ## Changes
+            ${{ needs.prepare.outputs.changelog }}
+
+            ## Installation
+
+            ### Windows
+            Download `ARISE_Setup_${{ needs.prepare.outputs.version }}.exe` from the assets below and run it.
+
+            ### Linux/macOS (Docker)
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}/core:${{ needs.prepare.outputs.version }}
+            docker pull ghcr.io/${{ github.repository }}/tauri:${{ needs.prepare.outputs.version }}
+            ```
+
+            ### From Source
+            ```bash
+            git clone https://github.com/${{ github.repository }}.git
+            cd ${{ github.repository }}
+            git checkout ${{ needs.prepare.outputs.version }}
+            make build
+            ```
+          files: |
+            tauri-artifacts/**/*.AppImage
+            tauri-artifacts/**/*.deb
+            tauri-artifacts/**/*.dmg
+            windows-installer/*.exe
+          draft: false
+          prerelease: ${{ contains(needs.prepare.outputs.version, 'rc') || contains(needs.prepare.outputs.version, 'beta') || contains(needs.prepare.outputs.version, 'alpha') }}
+
+  # =============================================================================
+  # Deploy to Staging
+  # =============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: github.ref == 'refs/heads/main' && !contains(needs.prepare.outputs.version, 'rc') && !contains(needs.prepare.outputs.version, 'beta') && !contains(needs.prepare.outputs.version, 'alpha')
+    environment: staging
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBECONFIG_STAGING }}
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install arise ./helm/arise \
+            --namespace arise-staging \
+            --create-namespace \
+            --set image.tag=${{ needs.prepare.outputs.version }} \
+            --set image.repository=ghcr.io/${{ github.repository }} \
+            --wait --timeout 10m
+
+      - name: Run smoke tests
+        run: |
+          # Wait for deployment to be ready
+          kubectl wait --for=condition=available --timeout=300s deployment/arise-core -n arise-staging
+          # Run basic health checks
+          kubectl exec -n arise-staging deployment/arise-core -- curl -f http://localhost:8000/health
+
+  # =============================================================================
+  # Notify
+  # =============================================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [create-release, deploy-staging]
+    if: always()
+    steps:
+      - name: Send notification
+        run: |
+          STATUS="${{ needs.create-release.result }}"
+          if [ "$STATUS" = "success" ]; then
+            MESSAGE="✅ ARISE ${{ needs.prepare.outputs.version }} released successfully!"
+          else
+            MESSAGE="❌ ARISE ${{ needs.prepare.outputs.version }} release failed!"
+          fi
+          echo "$MESSAGE"
+          # Add Slack/Discord/Teams webhook here if configured

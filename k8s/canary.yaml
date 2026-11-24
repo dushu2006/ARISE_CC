@@ -1,0 +1,278 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: arise-core-canary
+  namespace: arise
+  labels:
+    app: arise
+    component: core
+    deployment-strategy: canary
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: arise
+      component: core
+  strategy:
+    canary:
+      canaryMetadata:
+        labels:
+          role: canary
+      stableMetadata:
+        labels:
+          role: stable
+      steps:
+      - setWeight: 10
+      - pause: {duration: 5m}
+      - setWeight: 25
+      - pause: {duration: 5m}
+      - setWeight: 50
+      - pause: {duration: 10m}
+      - setWeight: 75
+      - pause: {duration: 5m}
+      - setWeight: 100
+      analysis:
+        templates:
+        - templateName: arise-success-rate
+      trafficRouting:
+        nginx:
+          stableIngress: arise-ingress
+          canaryIngress: arise-ingress-canary
+  template:
+    metadata:
+      labels:
+        app: arise
+        component: core
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: arise-core
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: core
+        image: ghcr.io/arise/core:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          value: "postgresql+asyncpg://arise:$(POSTGRES_PASSWORD)@postgres:5432/arise"
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis:6379/0"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: OPENAI_API_KEY
+              optional: true
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: ANTHROPIC_API_KEY
+              optional: true
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: GOOGLE_API_KEY
+              optional: true
+        - name: PORCUPINE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: PORCUPINE_ACCESS_KEY
+              optional: true
+        - name: ELEVENLABS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: ELEVENLABS_API_KEY
+              optional: true
+        - name: MASTER_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: MASTER_ENCRYPTION_KEY
+        - name: VAULT_ADDR
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: VAULT_ADDR
+              optional: true
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: VAULT_TOKEN
+              optional: true
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: arise-secrets
+              key: OTEL_EXPORTER_OTLP_ENDPOINT
+              optional: true
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: "1Gi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /live
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 30
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: arise-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arise-core-stable
+  namespace: arise
+  labels:
+    app: arise
+    component: core
+    role: stable
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: arise
+    component: core
+    role: stable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arise-core-canary
+  namespace: arise
+  labels:
+    app: arise
+    component: core
+    role: canary
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: arise
+    component: core
+    role: canary
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: arise-ingress-canary
+  namespace: arise
+  labels:
+    app: arise
+    component: ingress
+    role: canary
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "0"
+spec:
+  rules:
+  - host: api.arise.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: arise-core-canary
+            port:
+              number: 8000
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: arise-success-rate
+  namespace: arise
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    interval: 1m
+    count: 5
+    successCondition: result[0] >= 0.99
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          sum(rate(http_requests_total{service="{{args.service-name}}",code=~"2.."}[1m]))
+          /
+          sum(rate(http_requests_total{service="{{args.service-name}}"}[1m]))
+  - name: latency-p99
+    interval: 1m
+    count: 5
+    successCondition: result[0] <= 2.0
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[1m])) by (le)
+          )
+  - name: error-rate
+    interval: 1m
+    count: 5
+    successCondition: result[0] <= 0.01
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus:9090
+        query: |
+          sum(rate(http_requests_total{service="{{args.service-name}}",code=~"5.."}[1m]))
+          /
+          sum(rate(http_requests_total{service="{{args.service-name}}"}[1m]))

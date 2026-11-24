@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arise-config
+  namespace: arise
+  labels:
+    app: arise
+    component: config
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DATABASE_URL: "postgresql+asyncpg://arise:$(POSTGRES_PASSWORD)@postgres:5432/arise"
+  REDIS_URL: "redis://redis:6379/0"
+  MODEL_ROUTER_DEFAULT_PROVIDER: "openai"
+  MODEL_ROUTER_PRIVACY_MODE: "redact"
+  VOICE_ENABLED: "true"
+  VOICE_WAKE_WORD_SENSITIVITY: "0.5"
+  AUTOMATION_UIA_ENABLED: "true"
+  AUTOMATION_PLAYWRIGHT_ENABLED: "true"
+  AUTOMATION_CV_OCR_ENABLED: "true"
+  MEMORY_CONSOLIDATION_ENABLED: "true"
+  MEMORY_CONSOLIDATION_INTERVAL_HOURS: "6"
+  AGENTS_MULTI_AGENT_ENABLED: "true"
+  SECURITY_PROMPT_INJECTION_ENABLED: "true"
+  SECURITY_NETWORK_EGRESS_ENABLED: "true"
+  TELEMETRY_ENABLED: "true"
+  TELEMETRY_OTEL_ENDPOINT: "http://jaeger:4317"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arise-config-staging
+  namespace: arise-staging
+  labels:
+    app: arise
+    component: config
+    environment: staging
+data:
+  ENVIRONMENT: "staging"
+  LOG_LEVEL: "DEBUG"
+  DATABASE_URL: "postgresql+asyncpg://arise:$(POSTGRES_PASSWORD)@postgres:5432/arise"
+  REDIS_URL: "redis://redis:6379/0"
+  MODEL_ROUTER_DEFAULT_PROVIDER: "ollama"
+  MODEL_ROUTER_PRIVACY_MODE: "local_only"
+  VOICE_ENABLED: "true"
+  VOICE_WAKE_WORD_SENSITIVITY: "0.5"
+  AUTOMATION_UIA_ENABLED: "true"
+  AUTOMATION_PLAYWRIGHT_ENABLED: "true"
+  AUTOMATION_CV_OCR_ENABLED: "true"
+  MEMORY_CONSOLIDATION_ENABLED: "true"
+  MEMORY_CONSOLIDATION_INTERVAL_HOURS: "6"
+  AGENTS_MULTI_AGENT_ENABLED: "true"
+  SECURITY_PROMPT_INJECTION_ENABLED: "true"
+  SECURITY_NETWORK_EGRESS_ENABLED: "true"
+  TELEMETRY_ENABLED: "true"
+  TELEMETRY_OTEL_ENDPOINT: "http://jaeger:4317"

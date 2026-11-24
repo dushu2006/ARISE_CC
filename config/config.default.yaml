@@ -1,0 +1,401 @@
+version: 1.2.0
+name: ARISE
+environment: development
+debug: true
+database:
+  url: sqlite+aiosqlite:///./arise.db
+  pool_size: 5
+  max_overflow: 10
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+  echo_pool: false
+redis:
+  url: redis://localhost:6379/0
+  max_connections: 50
+  socket_timeout: 5
+  socket_connect_timeout: 5
+  retry_on_timeout: true
+  decode_responses: true
+model_router:
+  default_provider: openai
+  privacy_mode: standard
+  fallback_chain:
+  - openai
+  - anthropic
+  - gemini
+  - ollama
+  providers:
+    openai:
+      enabled: true
+      models:
+      - gpt-4o
+      - gpt-4o-mini
+      - gpt-4-turbo
+      default_model: gpt-4o-mini
+      timeout: 60
+      max_retries: 3
+    anthropic:
+      enabled: true
+      models:
+      - claude-3-5-sonnet-20241022
+      - claude-3-5-haiku-20241022
+      - claude-3-opus-20240229
+      default_model: claude-3-5-sonnet-20241022
+      timeout: 60
+      max_retries: 3
+    gemini:
+      enabled: true
+      models:
+      - gemini-1.5-pro
+      - gemini-1.5-flash
+      default_model: gemini-1.5-flash
+      timeout: 60
+      max_retries: 3
+    ollama:
+      enabled: true
+      base_url: http://localhost:11434
+      models:
+      - llama3.1:8b
+      - llama3.1:70b
+      - codellama:13b
+      default_model: llama3.1:8b
+      timeout: 120
+      max_retries: 2
+    azure_openai:
+      enabled: false
+      models: []
+      default_model: null
+      timeout: 60
+      max_retries: 3
+    vertex_ai:
+      enabled: false
+      models: []
+      default_model: null
+      timeout: 60
+      max_retries: 3
+  cost_tracking_enabled: true
+  circuit_breaker_enabled: true
+  circuit_breaker_threshold: 5
+  circuit_breaker_timeout: 60
+task_engine:
+  max_concurrent_tasks: 10
+  default_priority: 5
+  checkpoint_interval_seconds: 30
+  max_checkpoints_per_task: 100
+  task_timeout_seconds: 3600
+  queue_priority_levels: 10
+  fair_scheduling: true
+  persistence_enabled: true
+  sandbox:
+    enabled: true
+    type: docker
+    docker_image: arise/sandbox:latest
+    memory_limit_mb: 512
+    cpu_limit_percent: 50
+    disk_limit_mb: 1024
+    network_enabled: false
+    timeout_seconds: 300
+policy_engine:
+  risk_levels:
+    R0:
+      name: Read Only
+      auto_approve: true
+      requires_mfa: false
+      timeout_seconds: 0
+    R1:
+      name: Local Write
+      auto_approve: true
+      requires_mfa: false
+      timeout_seconds: 300
+    R2:
+      name: System Change
+      auto_approve: false
+      requires_mfa: false
+      timeout_seconds: 600
+    R3:
+      name: External Communication
+      auto_approve: false
+      requires_mfa: true
+      timeout_seconds: 300
+    R4:
+      name: Irreversible
+      auto_approve: false
+      requires_mfa: true
+      timeout_seconds: 60
+  capabilities:
+  - task.execute
+  - task.cancel
+  - filesystem.read
+  - filesystem.write
+  - filesystem.delete
+  - shell.exec
+  - network.http
+  - network.websocket
+  - browser.navigate
+  - browser.click
+  - browser.extract
+  - uia.find
+  - uia.click
+  - uia.input
+  - memory.store
+  - memory.query
+  - memory.delete
+  - voice.listen
+  - voice.speak
+  - agent.delegate
+  - agent.verify
+  - config.read
+  - config.write
+  - secrets.read
+  - secrets.write
+  - system.shutdown
+  - system.reboot
+  - credentials.read
+  - credentials.write
+  default_risk_level: R1
+  approval_ui_enabled: true
+  audit_enabled: true
+voice:
+  enabled: true
+  wake_word:
+    enabled: true
+    model: hey_arise
+    sensitivity: 0.5
+    audio_device: default
+    dormant_cpu_percent: 1.0
+  asr:
+    primary: sherpa_onnx
+    fallback_chain:
+    - sherpa_onnx
+    - whisper
+    - gemini
+    - azure
+    language: auto
+    vad_enabled: true
+    vad_threshold: 0.5
+  tts:
+    primary: gemini
+    fallback_chain:
+    - gemini
+    - coqui
+    - elevenlabs
+    - azure
+    voice: en-US-Neural2-F
+    streaming: true
+  session:
+    timeout_seconds: 30
+    max_duration_seconds: 3600
+    barge_in_enabled: true
+    context_preservation: true
+memory:
+  enabled: true
+  kinds:
+    SEMANTIC:
+      enabled: true
+      max_items: 100000
+      ttl_days: 3650
+    EPISODIC:
+      enabled: true
+      max_items: 50000
+      ttl_days: 365
+    PROCEDURAL:
+      enabled: true
+      max_items: 10000
+      ttl_days: 3650
+    PREFERENCE:
+      enabled: true
+      max_items: 1000
+      ttl_days: 3650
+    WORKING:
+      enabled: true
+      max_items: 1000
+      ttl_days: 7
+  stores:
+    chromadb:
+      enabled: true
+      persist_directory: ./data/chromadb
+      collection_name: arise_memories
+    sqlite_fts:
+      enabled: true
+      database_path: ./data/memory_fts.db
+  consolidation:
+    enabled: true
+    interval_hours: 6
+    working_to_episodic_threshold: 0.7
+    episodic_to_semantic_threshold: 0.8
+    preference_extraction_enabled: true
+    procedural_learning_enabled: true
+  governance:
+    pii_detection_enabled: true
+    pii_action: redact
+    encryption_enabled: true
+    max_memories_per_kind: 100000
+    lru_eviction_enabled: true
+automation:
+  enabled: true
+  perception_hierarchy:
+  - uia
+  - playwright
+  - cv_ocr
+  uia:
+    enabled: true
+    backend: comtypes
+    retry_attempts: 3
+    retry_delay_ms: 100
+    screenshot_on_failure: true
+  playwright:
+    enabled: true
+    browser: chromium
+    headless: false
+    stealth_mode: false
+    context_isolation: true
+  cv_ocr:
+    enabled: true
+    ocr_engine: tesseract
+    tesseract_path: tesseract
+    paddleocr_lang: en
+    confidence_threshold: 0.7
+    template_matching_enabled: true
+  coordinator:
+    cross_app_enabled: true
+    clipboard_sync: true
+    window_management: true
+    safety_confirmations: true
+    max_workflow_steps: 50
+security:
+  credentials:
+    primary_provider: windows_credential_manager
+    fallback_providers:
+    - keyring
+    - vault
+    - env
+  network:
+    egress_control_enabled: true
+    default_policy: deny
+    allowlist:
+    - api.openai.com
+    - api.anthropic.com
+    - generativelanguage.googleapis.com
+    - localhost
+    - 127.0.0.1
+    denylist: []
+    dns_blocking_enabled: true
+    proxy_interception_enabled: true
+  prompt_injection:
+    enabled: true
+    model: promptguard
+    heuristic_rules_enabled: true
+    integration_points:
+    - model_router_input
+    - agent_input
+    - automation_input
+  audit:
+    enabled: true
+    tamper_evident: true
+    encryption_enabled: true
+    log_credential_access: true
+    log_network_blocks: true
+    log_prompt_injections: true
+  encryption:
+    algorithm: AES-256-GCM
+    key_derivation: PBKDF2
+    key_rotation_days: 90
+    field_level_encryption: true
+agents:
+  enabled: true
+  coordinator:
+    enabled: true
+    model: gpt-4o
+    max_delegation_depth: 5
+    timeout_seconds: 300
+  specialists:
+    planner:
+      enabled: true
+      model: gpt-4o
+    coder:
+      enabled: true
+      model: gpt-4o
+    researcher:
+      enabled: true
+      model: gemini-1.5-pro
+    analyst:
+      enabled: true
+      model: claude-3-5-sonnet-20241022
+    creative:
+      enabled: true
+      model: gpt-4o
+    automation:
+      enabled: true
+      model: gpt-4o-mini
+    memory:
+      enabled: true
+      model: gpt-4o-mini
+    security:
+      enabled: true
+      model: gpt-4o-mini
+    reviewer:
+      enabled: true
+      model: gpt-4o
+    communicator:
+      enabled: true
+      model: gpt-4o-mini
+    scheduler:
+      enabled: true
+      model: gpt-4o-mini
+  registry:
+    heartbeat_interval_seconds: 30
+    max_restarts: 3
+    health_check_timeout: 10
+frontend:
+  api_base_url: http://localhost:8000
+  ws_base_url: ws://localhost:8000
+  theme: dark
+  language: en
+  auto_refresh_interval: 30000
+telemetry:
+  enabled: true
+  logging:
+    level: INFO
+    format: json
+    output: stdout
+    correlation_id_header: X-Correlation-ID
+  metrics:
+    enabled: true
+    port: 9090
+    path: /metrics
+  tracing:
+    enabled: true
+    jaeger_endpoint: http://localhost:4317
+    sample_rate: 0.1
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+events:
+  local:
+    enabled: true
+    worker_count: 4
+    queue_size: 10000
+    dead_letter_queue_size: 1000
+  distributed:
+    enabled: false
+    redis_streams_enabled: true
+    consumer_group: arise-events
+  store:
+    enabled: true
+    type: sqlite
+    path: ./data/events.db
+    wal_mode: true
+  projections:
+    enabled: true
+    checkpoint_interval: 100
+  tracing:
+    enabled: true
+    correlation_header: X-Correlation-ID
+feature_flags: {}
+secrets:
+  primary_provider: windows_credential_manager
+  fallback_providers:
+  - keyring
+  - file
+  - env

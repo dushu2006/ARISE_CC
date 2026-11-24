@@ -1,0 +1,100 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: arise-ingress
+  namespace: arise
+  labels:
+    app: arise
+    component: ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/websocket-services: "arise-core"
+spec:
+  tls:
+  - hosts:
+    - api.arise.example.com
+    - app.arise.example.com
+    - monitoring.arise.example.com
+    secretName: arise-tls
+  rules:
+  # API Ingress
+  - host: api.arise.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: arise-core
+            port:
+              number: 8000
+  # Frontend Ingress
+  - host: app.arise.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: arise-frontend
+            port:
+              number: 80
+  # Monitoring Ingress
+  - host: monitoring.arise.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: arise-ingress-staging
+  namespace: arise-staging
+  labels:
+    app: arise
+    component: ingress
+    environment: staging
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  tls:
+  - hosts:
+    - api-staging.arise.example.com
+    - app-staging.arise.example.com
+    secretName: arise-tls-staging
+  rules:
+  - host: api-staging.arise.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: arise-core
+            port:
+              number: 8000
+  - host: app-staging.arise.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: arise-frontend
+            port:
+              number: 80
