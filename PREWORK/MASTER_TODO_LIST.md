@@ -461,74 +461,92 @@
 
 ### 3.1 Memory System (Ref: `10_Memory_and_Knowledge.md`, `05_Detailed_Component_Design.md`)
 
-- [ ] **3.1.1** Create `core/memory/models.py`:
-  - [ ] `MemoryKind` enum (SEMANTIC, PREFERENCE, EPISODIC, PROCEDURAL, WORKING)
-  - [ ] `Memory` dataclass with id, kind, content, embedding, confidence, metadata, tags, TTL, created_at, accessed_at
-  - [ ] `MemoryQuery`, `MemoryResult` dataclasses
+- [x] **3.1.1** Create `core/memory/models.py`:
+  - [x] `MemoryKind` enum (SEMANTIC, PREFERENCE, EPISODIC, PROCEDURAL, WORKING)
+  - [x] `Memory` dataclass with id, kind, content, embedding, confidence, metadata, tags, TTL, created_at, accessed_at
+  - [x] `MemoryQuery`, `MemoryResult` dataclasses
+  - [x] `MemorySource` enum, `ConsolidationResult` dataclass
 
-- [ ] **3.1.2** Create `core/memory/store.py`:
-  - [ ] `MemoryStore` abstract base
-  - [ ] `ChromaDBStore` implementation (vector + metadata)
-  - [ ] `SQLiteFTSStore` implementation (full-text search)
-  - [ ] Hybrid query combining vector + FTS + metadata filters
+- [x] **3.1.2** Create `core/memory/store.py`:
+  - [x] `MemoryStore` abstract base
+  - [x] `ChromaDBStore` implementation (vector + metadata)
+  - [x] `SQLiteFTSStore` implementation (full-text search)
+  - [x] `HybridMemoryStore` combining vector + FTS + metadata filters
+  - [x] `create_memory_store` factory function
 
-- [ ] **3.1.3** Create `core/memory/consolidation.py`:
-  - [ ] `ConsolidationPipeline` scheduled job (every 6 hours)
-  - [ ] Working → Episodic promotion
-  - [ ] Episodic → Semantic abstraction (LLM-based)
-  - [ ] Preference extraction from patterns
-  - [ ] Procedural skill learning from repetitions
-  - [ ] Conflict resolution (timestamp + confidence)
+- [x] **3.1.3** Create `core/memory/consolidation.py`:
+  - [x] `ConsolidationPipeline` scheduled job (every 6 hours)
+  - [x] Working → Episodic promotion
+  - [x] Episodic → Semantic abstraction (LLM-based)
+  - [x] Preference extraction from patterns
+  - [x] Procedural skill learning from repetitions
+  - [x] Conflict resolution (timestamp + confidence)
 
-- [ ] **3.1.4** Create `core/memory/governance.py`:
-  - [ ] `PIIDetector` with Presidio integration
-  - [ ] Actions: flag, redact, block per config
-  - [ ] TTL enforcement with background sweeper
-  - [ ] Max memories per kind enforcement (LRU eviction)
-  - [ ] Memory encryption at rest
+- [x] **3.1.4** Create `core/memory/governance.py`:
+  - [x] `PIIDetector` with Presidio integration + regex fallback
+  - [x] Actions: flag, redact, block per config
+  - [x] TTL enforcement with background sweeper
+  - [x] Max memories per kind enforcement (LRU eviction)
+  - [x] Memory encryption at rest (via encryption manager)
 
-- [ ] **3.1.5** Create `core/memory/system.py` with `MemorySystem` facade:
-  - [ ] `store(kind, content, confidence, metadata, tags)` → memory_id
-  - [ ] `query(query, kind, limit, filters)` → results
-  - [ ] `get(memory_id)` → memory
-  - [ ] `update(memory_id, updates)` → bool
-  - [ ] `delete(memory_id)` → bool
-  - [ ] `trigger_consolidation(kind)` → manual trigger
+- [x] **3.1.5** Create `core/memory/system.py` with `MemorySystem` facade:
+  - [x] `store(kind, content, confidence, metadata, tags)` → memory_id
+  - [x] `query(query, kind, limit, filters)` → results
+  - [x] `get(memory_id)` → memory
+  - [x] `update(memory_id, updates)` → bool
+  - [x] `delete(memory_id)` → bool
+  - [x] `trigger_consolidation(kind)` → manual trigger
+  - [x] `enforce_ttl()`, `enforce_lru()`, `get_governance_stats()`, `get_stats()`
 
-- [ ] **3.1.6** Create FastAPI endpoints in `core/runtime/api/memory.py` per `19_API_Specifications.md`:
-  - [x] API stubs created (returning 501 Not Implemented)
-  - [ ] Full implementation with actual memory system
+- [x] **3.1.6** Create FastAPI endpoints in `core/runtime/api/memory.py` per `19_API_Specifications.md`:
+  - [x] Full implementation with actual memory system
+  - [x] POST /api/v1/memory - store
+  - [x] GET /api/v1/memory - query with filters
+  - [x] GET /api/v1/memory/{memory_id} - get
+  - [x] PATCH /api/v1/memory/{memory_id} - update
+  - [x] DELETE /api/v1/memory/{memory_id} - delete
+  - [x] POST /api/v1/memory/consolidate - trigger consolidation
+  - [x] GET /api/v1/memory/consolidate/status - consolidation status
+  - [x] POST /api/v1/memory/governance/ttl - enforce TTL
+  - [x] POST /api/v1/memory/governance/lru - enforce LRU
+  - [x] GET /api/v1/memory/governance/stats - governance stats
+  - [x] GET /api/v1/memory/stats - memory system stats
+  - [x] GET /api/v1/memory/health - health check
 
 ### 3.2 Security Hardening (Ref: `12_Security_and_Permissions.md`, `25_Configuration_Management.md`)
 
-- [ ] **3.2.1** Create `core/security/credentials.py`:
-  - [ ] `CredentialManager` using Windows Credential Manager (primary)
-  - [ ] Fallback to keyring, Vault, env
-  - [ ] `get_credential(category, key)`, `set_credential`, `delete_credential`
+- [x] **3.2.1** Create `core/security/credentials.py`:
+  - [x] `CredentialManager` using Windows Credential Manager (primary)
+  - [x] Fallback to keyring, Vault, env, encrypted file
+  - [x] `get_credential(category, key)`, `set_credential`, `delete_credential`, `list_credentials`
 
-- [ ] **3.2.2** Create `core/security/network.py`:
-  - [ ] `EgressController` with allowlist/denylist
-  - [ ] Per-capability network permissions
-  - [ ] DNS resolution blocking for denylisted domains
-  - [ ] HTTP/HTTPS proxy interception for validation
+- [x] **3.2.2** Create `core/security/network.py`:
+  - [x] `EgressController` with allowlist/denylist
+  - [x] Per-capability network permissions
+  - [x] DNS resolution blocking for denylisted domains
+  - [x] HTTP/HTTPS proxy interception for validation
+  - [x] Socket patching for automatic interception
 
-- [ ] **3.2.3** Create `core/security/prompt_injection.py`:
-  - [ ] `PromptInjectionDetector` with PropmtGuard/DeBERTa model
-  - [ ] Heuristic rules (instruction override, role play, data exfiltration)
-  - [ ] Integration points: model router input, agent input, automation input
+- [x] **3.2.3** Create `core/security/prompt_injection.py`:
+  - [x] `PromptInjectionDetector` with PromptGuard/DeBERTa model support
+  - [x] Heuristic rules (instruction override, role play, data exfiltration, jailbreak, etc.)
+  - [x] Integration points: model router input, agent input, automation input
+  - [x] Async detection with ML model
 
-- [ ] **3.2.4** Create `core/security/audit.py`:
-  - [ ] `SecurityAuditLogger` extending policy audit
-  - [ ] Credential access logging
-  - [ ] Network block events
-  - [ ] Prompt injection detection events
-  - [ ] Tamper detection (hash chains)
+- [x] **3.2.4** Create `core/security/audit.py`:
+  - [x] `SecurityAuditLogger` extending policy audit
+  - [x] Credential access logging
+  - [x] Network block events
+  - [x] Prompt injection detection events
+  - [x] Tamper detection (hash chains)
+  - [x] Query API, acknowledgment, chain verification
 
-- [ ] **3.2.5** Create `core/security/encryption.py`:
-  - [ ] AES-256-GCM for data at rest
-  - [ ] Key derivation from master key (PBKDF2)
-  - [ ] Key rotation (90 days default)
-  - [ ] Field-level encryption for PII
+- [x] **3.2.5** Create `core/security/encryption.py`:
+  - [x] AES-256-GCM for data at rest
+  - [x] Key derivation from master key (PBKDF2)
+  - [x] Key rotation (90 days default)
+  - [x] Field-level encryption for PII
+  - [x] `FieldEncryption` helper for automatic PII field encryption
 
 ---
 
